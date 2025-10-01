@@ -6,7 +6,13 @@
             Gauge$Child
             Gauge$Timer
             Summary$Child
-            Summary$Timer]))
+            Summary$Timer]
+           [io.prometheus.metrics.core.datapoints DistributionDataPoint Timer TimerApi]))
+
+
+(defn- start-timer* [^TimerApi datapoint]
+  (let [^Timer t (.startTimer ^TimerApi datapoint)]
+    #(.observeDuration t)))
 
 ;; ## Operation Protocols
 
@@ -76,8 +82,7 @@
 
   TimeableCollector
   (start-timer [this]
-    (let [^Gauge$Timer t (.startTimer ^Gauge$Child this)]
-      #(.setDuration t))))
+    (start-timer* this)))
 
 ;; ## Histogram
 
@@ -97,8 +102,7 @@
 
   TimeableCollector
   (start-timer [this]
-    (let [^Histogram$Timer t (.startTimer ^Histogram$Child this)]
-      #(.observeDuration t))))
+    (start-timer* this)))
 
 ;; ## Summary
 
@@ -117,5 +121,4 @@
 
   TimeableCollector
   (start-timer [this]
-    (let [^Summary$Timer t (.startTimer ^Summary$Child this)]
-      #(.observeDuration t))))
+    (start-timer* this)))
