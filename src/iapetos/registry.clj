@@ -3,7 +3,7 @@
   (:require [iapetos.registry
              [collectors :as collectors]
              [utils :as utils]])
-  (:import [io.prometheus.client Collector CollectorRegistry]))
+  (:import [io.prometheus.metrics.model.registry PrometheusRegistry]))
 
 ;; ## Protocol
 
@@ -25,7 +25,7 @@
     "Retrieve the collector instance associated with the given metric,
      setting the given labels.")
   (raw [registry]
-    "Retrieve the underlying `CollectorRegistry`.")
+    "Retrieve the underlying `PrometheusRegistry`.")
   (name [registry]
     "Retrieve the registry name (for exporting)."))
 
@@ -89,12 +89,12 @@
 (defn create
   ([] (create "iapetos_registry"))
   ([registry-name]
-   (create registry-name (CollectorRegistry.)))
-  ([registry-name ^CollectorRegistry registry]
+   (create registry-name (PrometheusRegistry.)))
+  ([registry-name ^PrometheusRegistry registry]
    (->> (collectors/initialize)
         (IapetosRegistry. registry-name registry {}))))
 
 (def default
   (create
     "prometheus_default_registry"
-    (CollectorRegistry/defaultRegistry)))
+    PrometheusRegistry/defaultRegistry))
