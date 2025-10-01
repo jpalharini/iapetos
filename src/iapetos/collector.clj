@@ -65,15 +65,15 @@
                                 lazy?]
   Collector
   (instantiate [this registry-options]
-    (let [subsystem (check-subsystem this registry-options)]
-      (-> ^SimpleCollector$Builder
+    (let [subsystem (check-subsystem this registry-options)
+          name      (cond->> name
+                             subsystem (str subsystem "_")
+                             namespace (str namespace "_"))]
+      (-> ^MetricWithFixedMetadata$Builder
           (builder-constructor)
           (.name name)
-          (.namespace namespace)
           (.help description)
-          (.labelNames (label-array labels))
-          (cond-> subsystem (.subsystem subsystem))
-          (.create))))
+          (.labelNames (label-array labels)))))
   (metric [_]
     {:name      name
      :namespace namespace})
