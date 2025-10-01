@@ -7,8 +7,8 @@
             Gauge$Timer
             Summary$Child
             Summary$Timer]
-           [io.prometheus.metrics.core.datapoints DistributionDataPoint Timer TimerApi]))
-
+           [io.prometheus.metrics.core.datapoints DistributionDataPoint Timer TimerApi]
+           [io.prometheus.metrics.core.metrics Counter$DataPoint Gauge$DataPoint Histogram$DataPoint Summary$DataPoint]))
 
 (defn- start-timer* [^TimerApi datapoint]
   (let [^Timer t (.startTimer ^TimerApi datapoint)]
@@ -47,36 +47,36 @@
 
 ;; ## Counter
 
-(extend-type Counter$Child
+(extend-type Counter$DataPoint
   ReadableCollector
   (read-value [this]
-    (.get ^Counter$Child this))
+    (.get ^Counter$DataPoint this))
   IncrementableCollector
   (increment* [this amount]
-    (.inc ^Counter$Child this (double amount))))
+    (.inc ^Counter$DataPoint this (double amount))))
 
 ;; ## Gauge
 
-(extend-type Gauge$Child
+(extend-type Gauge$DataPoint
   ReadableCollector
   (read-value [this]
-    (.get ^Gauge$Child this))
+    (.get ^Gauge$DataPoint this))
 
   IncrementableCollector
   (increment* [this amount]
-    (.inc ^Gauge$Child this (double amount)))
+    (.inc ^Gauge$DataPoint this (double amount)))
 
   DecrementableCollector
   (decrement* [this amount]
-    (.dec ^Gauge$Child this (double amount)))
+    (.dec ^Gauge$DataPoint this (double amount)))
 
   ObservableCollector
   (observe [this amount]
-    (.set ^Gauge$Child this (double amount)))
+    (.set ^Gauge$DataPoint this (double amount)))
 
   SettableCollector
   (set-value [this value]
-    (.set ^Gauge$Child this (double value)))
+    (.set ^Gauge$DataPoint this (double value)))
   (set-value-to-current-time [this]
     (.setToCurrentTime ^Gauge$Child this))
 
@@ -86,7 +86,7 @@
 
 ;; ## Histogram
 
-(extend-type Histogram$Child
+(extend-type Histogram$DataPoint
   ReadableCollector
   (read-value [this]
     (let [^io.prometheus.client.Histogram$Child$Value value
@@ -98,7 +98,7 @@
 
   ObservableCollector
   (observe [this amount]
-    (.observe ^Histogram$Child this (double amount)))
+    (.observe ^Histogram$DataPoint this (double amount)))
 
   TimeableCollector
   (start-timer [this]
@@ -117,7 +117,7 @@
 
   ObservableCollector
   (observe [this amount]
-    (.observe ^Summary$Child this (double amount)))
+    (.observe ^Summary$DataPoint this (double amount)))
 
   TimeableCollector
   (start-timer [this]
