@@ -109,10 +109,8 @@
 ;; ## Implementation for Raw Collectors
 
 (defn- raw-metric
-  [^io.prometheus.client.Collector v]
-  (if-let [n (some-> (.collect v)
-                     ^Collector$MetricFamilySamples (first)
-                     (.name))]
+  [^io.prometheus.metrics.model.registry.Collector v]
+  (if-let [n (.getPrometheusName v)]
     (let [[a b] (.split n "_" 2)]
       (if b
         {:name b, :namespace a}
