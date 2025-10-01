@@ -1,10 +1,6 @@
 (ns iapetos.collector
   (:require [iapetos.metric :as metric])
-  (:import [io.prometheus.client
-            Collector$MetricFamilySamples
-            CollectorRegistry
-            SimpleCollector
-            SimpleCollector$Builder]))
+  (:import [io.prometheus.metrics.core.metrics MetricWithFixedMetadata$Builder StatefulMetric]))
 
 ;; ## Protocol
 
@@ -32,14 +28,14 @@
   (map metric/dasherize labels))
 
 (defn- set-labels
-  "Attach labels to the given `SimpleCollector` instance."
-  [^SimpleCollector instance labels values]
+  "Attach labels to the given `StatefulMetric` instance."
+  [^StatefulMetric instance labels values]
   (let [label->value (->> (for [[k v] values]
                             [(-> k metric/dasherize) v])
                           (into {})
                           (comp str))
         ordered-labels (->> labels (map label->value) (into-array String))]
-    (.labels instance ordered-labels)))
+    (.labelValues instance ordered-labels)))
 
 ;; ## Record
 
