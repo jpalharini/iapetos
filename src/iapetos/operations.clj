@@ -8,7 +8,26 @@
             Summary$Child
             Summary$Timer]
            [io.prometheus.metrics.core.datapoints DistributionDataPoint Timer TimerApi]
-           [io.prometheus.metrics.core.metrics Counter$DataPoint Gauge$DataPoint Histogram$DataPoint Summary$DataPoint]))
+           [io.prometheus.metrics.core.metrics Counter$DataPoint Gauge$DataPoint Histogram$DataPoint Summary$DataPoint]
+           [java.lang.reflect Field]))
+
+; I dislike this, but it seemed to be the shortest way to get these values from a
+; <class>$DataPoint, since that does not have any methods to collect this info.
+;
+; Another way to do this is by adding a different code path when doing registry/get
+; for a read of a distribution metric, so that it doesn't return a DataPoint. However,
+; then it needs to run (.collect) and find the right snapshot that matches the label map.
+;
+; Opened https://github.com/prometheus/client_java/issues/1610 to check for alternatives.
+(defn- get-distribution-values [^Class klass ^DistributionDataPoint datapoint]
+  (letfn [(get-private-val [field-name]
+            (when-let [f ^Field (.getDeclaredField klass field-name)]
+              (.setAccessible f true)
+              (.get f datapoint)))]
+    (cond-> {:count (get-private-val "count")
+             :sum   (get-private-val "sum")}
+            (= klass Histogram$DataPoint) (assoc :buckets (get-private-val "classicBuckets"))
+            (= klass Summary$DataPoint) (assoc :quantiles (get-private-val "quantileValues")))))
 
 (defn- start-timer* [^TimerApi datapoint]
   (let [^Timer t (.startTimer ^TimerApi datapoint)]
@@ -89,12 +108,13 @@
 (extend-type Histogram$DataPoint
   ReadableCollector
   (read-value [this]
-    (let [^io.prometheus.client.Histogram$Child$Value value
-          (.get ^Histogram$Child this)
-          buckets (vec (.-buckets value))]
-      {:sum     (.-sum value)
-       :count   (last buckets)
-       :buckets buckets}))
+    (get-distribution-values Histogram$DataPoint this)
+    #_(let [^io.prometheus.client.Histogram$Child$Value value
+            (.get ^Histogram$Child this)
+            buckets (vec (.-buckets value))]
+        {:sum     (.-sum value)
+         :count   (last buckets)
+         :buckets buckets}))
 
   ObservableCollector
   (observe [this amount]
