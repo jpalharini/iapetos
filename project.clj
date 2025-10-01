@@ -14,7 +14,9 @@
                  [io.prometheus/simpleclient "0.12.0"]
                  [io.prometheus/simpleclient_common "0.12.0"]
                  [io.prometheus/simpleclient_pushgateway "0.12.0"]
-                 [io.prometheus/simpleclient_hotspot "0.12.0" :scope "provided"]]
+                 [io.prometheus/simpleclient_hotspot "0.12.0" :scope "provided"]
+                 [io.prometheus/prometheus-metrics-core "1.4.1"]
+                 [io.prometheus/prometheus-metrics-instrumentation-jvm "1.4.1" :scope "provided"]]
   :profiles {:dev
              {:dependencies [[org.clojure/test.check "1.1.0"]
                              [aleph "0.4.6"]
