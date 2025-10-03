@@ -14,7 +14,10 @@
   (metric-id [this]
     "Return user supplied (unsanitized) identifier for this collector.")
   (label-instance [this instance values]
-    "Add labels to the given collector instance produced by `instantiate`."))
+    "Add labels to the given collector instance produced by `instantiate`.")
+  (is-distribution? [this]
+    "Returns true if given collector is a distribution metric (histogram or summary),
+     false otherwise"))
 
 ;; ## Labels
 
@@ -27,15 +30,20 @@
   [labels]
   (map metric/dasherize labels))
 
-(defn- set-labels
-  "Attach labels to the given `StatefulMetric` instance."
-  [^StatefulMetric instance labels values]
+(defn ordered-labels
+  ^"[Ljava.lang.String;"
+  [labels values]
   (let [label->value (->> (for [[k v] values]
                             [(-> k metric/dasherize) v])
                           (into {})
-                          (comp str))
-        ordered-labels (->> labels (map label->value) (into-array String))]
-    (.labelValues instance ordered-labels)))
+                          (comp str))]
+    (->> labels (map label->value) (into-array String))))
+
+(defn- set-labels
+  "Attach labels to the given `StatefulMetric` instance."
+  [^StatefulMetric instance labels values]
+  (let [ordered (ordered-labels labels values)]
+    (.labelValues instance ordered)))
 
 ;; ## Record
 
@@ -76,7 +84,10 @@
   (metric-id [_]
     metric-id)
   (label-instance [_ instance values]
-    (set-labels instance labels values)))
+    (set-labels instance labels values))
+  (is-distribution? [_]
+   (or (= type :histogram)
+       (= type :summary))))
 
 (defn make-simple-collector
   "Create a new simple collector representation to be instantiated and

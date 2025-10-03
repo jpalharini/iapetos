@@ -1,4 +1,5 @@
 (ns iapetos.operations
+  (:require [iapetos.collector :as collector])
   (:import [io.prometheus.client
             Counter$Child
             Histogram$Child
@@ -8,26 +9,20 @@
             Summary$Child
             Summary$Timer]
            [io.prometheus.metrics.core.datapoints DistributionDataPoint Timer TimerApi]
-           [io.prometheus.metrics.core.metrics Counter$DataPoint Gauge$DataPoint Histogram$DataPoint Summary$DataPoint]
-           [java.lang.reflect Field]))
+           [io.prometheus.metrics.core.metrics Counter$DataPoint Gauge$DataPoint Histogram$DataPoint StatefulMetric Summary Summary$DataPoint]
+           [io.prometheus.metrics.model.snapshots ClassicHistogramBucket ClassicHistogramBuckets DataPointSnapshot DistributionDataPointSnapshot HistogramSnapshot$HistogramDataPointSnapshot Labels MetricSnapshot]
+           [java.util List]))
 
-; I dislike this, but it seemed to be the shortest way to get these values from a
-; <class>$DataPoint, since that does not have any methods to collect this info.
-;
-; Another way to do this is by adding a different code path when doing registry/get
-; for a read of a distribution metric, so that it doesn't return a DataPoint. However,
-; then it needs to run (.collect) and find the right snapshot that matches the label map.
-;
-; Opened https://github.com/prometheus/client_java/issues/1610 to check for alternatives.
-(defn- get-distribution-values [^Class klass ^DistributionDataPoint datapoint]
-  (letfn [(get-private-val [field-name]
-            (when-let [f ^Field (.getDeclaredField klass field-name)]
-              (.setAccessible f true)
-              (.get f datapoint)))]
-    (cond-> {:count (get-private-val "count")
-             :sum   (get-private-val "sum")}
-            (= klass Histogram$DataPoint) (assoc :buckets (get-private-val "classicBuckets"))
-            (= klass Summary$DataPoint) (assoc :quantiles (get-private-val "quantileValues")))))
+(defn- get-latest-distribution-snapshot [{:keys [register collector]} labels]
+  (let [instance   ^StatefulMetric @register
+        snapshot   ^MetricSnapshot (.collect instance)
+        reg-labels ^"[Ljava.lang.String;" (into-array (:labels collector))
+        labels-obj ^Labels (Labels/of reg-labels (collector/ordered-labels reg-labels labels))]
+    (loop [datapoints (.getDataPoints snapshot)]
+      (when-let [curr-datapoint ^DataPointSnapshot (first datapoints)]
+        (if (= (.getLabels curr-datapoint) labels-obj)
+          curr-datapoint
+          (recur (rest datapoints)))))))
 
 (defn- start-timer* [^TimerApi datapoint]
   (let [^Timer t (.startTimer ^TimerApi datapoint)]
@@ -105,17 +100,13 @@
 
 ;; ## Histogram
 
-(extend-type Histogram$DataPoint
-  ReadableCollector
-  (read-value [this]
-    (get-distribution-values Histogram$DataPoint this)
-    #_(let [^io.prometheus.client.Histogram$Child$Value value
-            (.get ^Histogram$Child this)
-            buckets (vec (.-buckets value))]
-        {:sum     (.-sum value)
-         :count   (last buckets)
-         :buckets buckets}))
+(defn- buckets->vec
+  [^HistogramSnapshot$HistogramDataPointSnapshot snapshot]
+  (let [buckets ^ClassicHistogramBuckets (.getClassicBuckets snapshot)]
+    (->> buckets (.iterator) (iterator-seq)
+         (mapv #(.getCount ^ClassicHistogramBucket %)))))
 
+(extend-type Histogram$DataPoint
   ObservableCollector
   (observe [this amount]
     (.observe ^Histogram$DataPoint this (double amount)))
@@ -126,15 +117,7 @@
 
 ;; ## Summary
 
-(extend-type Summary$Child
-  ReadableCollector
-  (read-value [this]
-    (let [^io.prometheus.client.Summary$Child$Value value
-          (.get ^Summary$Child this)]
-      {:sum       (.-sum value)
-       :count     (.-count value)
-       :quantiles (into {} (.-quantiles value))}))
-
+(extend-type Summary$DataPoint
   ObservableCollector
   (observe [this amount]
     (.observe ^Summary$DataPoint this (double amount)))
@@ -142,3 +125,12 @@
   TimeableCollector
   (start-timer [this]
     (start-timer* this)))
+
+(defn read-distribution-value [metric labels]
+  (when-let [snapshot ^DistributionDataPointSnapshot (get-latest-distribution-snapshot metric labels)]
+    (let [type (-> metric :collector :type)]
+      (cond-> {:count (.getCount snapshot)
+               :sum   (.getSum snapshot)}
+              (= type :histogram) (assoc :buckets (buckets->vec snapshot))
+              ; todo: implement similar logic to find quantiles - needs to be a map!
+              (= type :summary) (assoc :quantiles nil)))))

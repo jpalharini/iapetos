@@ -4,7 +4,8 @@
             [iapetos.operations :as ops]
             [iapetos.registry :as registry])
   (:refer-clojure :exclude [get inc dec set])
-  (:import [io.prometheus.metrics.core.metrics Counter
+  (:import [io.prometheus.metrics.core.datapoints DistributionDataPoint]
+           [io.prometheus.metrics.core.metrics Counter
                                                Gauge
                                                Histogram
                                                Summary Summary$Builder]))
@@ -337,7 +338,10 @@
    (value registry metric {}))
   ([registry metric labels]
    (with-metric-exception metric
-     (value (registry/get registry metric labels)))))
+     (let [collector (registry/get registry metric)]
+       (if (collector/is-distribution? (:collector collector))
+         (ops/read-distribution-value collector labels)
+         (value collector))))))
 
 ;; ## Compound Operations
 
