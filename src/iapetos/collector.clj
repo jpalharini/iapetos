@@ -1,6 +1,6 @@
 (ns iapetos.collector
   (:require [iapetos.metric :as metric])
-  (:import [io.prometheus.metrics.core.metrics MetricWithFixedMetadata$Builder StatefulMetric]))
+  (:import [io.prometheus.metrics.core.metrics MetricWithFixedMetadata MetricWithFixedMetadata$Builder StatefulMetric]))
 
 ;; ## Protocol
 
@@ -77,7 +77,8 @@
           (builder-constructor)
           (.name name)
           (.help description)
-          (.labelNames (label-array labels)))))
+          (.labelNames (label-array labels))
+          (.build))))
   (metric [_]
     {:name      name
      :namespace namespace})
@@ -116,7 +117,7 @@
 ;; ## Implementation for Raw Collectors
 
 (defn- raw-metric
-  [^io.prometheus.metrics.model.registry.Collector v]
+  [^MetricWithFixedMetadata v]
   (if-let [n (.getPrometheusName v)]
     (let [[a b] (.split n "_" 2)]
       (if b
@@ -126,7 +127,7 @@
      :namespace "raw"}))
 
 (extend-protocol Collector
-  io.prometheus.client.Collector
+  StatefulMetric
   (instantiate [this _]
     this)
   (metric [this]
