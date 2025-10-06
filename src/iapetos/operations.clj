@@ -92,7 +92,8 @@
   (set-value [this value]
     (.set ^Gauge$DataPoint this (double value)))
   (set-value-to-current-time [this]
-    (.setToCurrentTime ^Gauge$Child this))
+    (let [unix-time (/ (System/currentTimeMillis) 1000.0)]
+      (.set ^Gauge$DataPoint this unix-time)))
 
   TimeableCollector
   (start-timer [this]
