@@ -3,8 +3,8 @@
   (:import [io.prometheus.client CollectorRegistry]
            [io.prometheus.client.exporter
             PushGateway]
-           [io.prometheus.client.exporter.common
-            TextFormat]))
+           [io.prometheus.metrics.expositionformats PrometheusTextFormatWriter]
+           [io.prometheus.metrics.model.registry PrometheusRegistry]))
 
 ;; ## TextFormat (v0.0.4)
 
@@ -12,9 +12,10 @@
   "Dump the given registry to the given writer using the Prometheus text format
    (version 0.0.4)."
   [^java.io.Writer w registry]
-  (TextFormat/write004
-    w
-    (.metricFamilySamples ^CollectorRegistry (registry/raw registry))))
+  (let [prom-writer ^PrometheusTextFormatWriter (PrometheusTextFormatWriter/create)]
+    (.write prom-writer
+            w
+            (.scrape ^PrometheusRegistry (registry/raw registry)))))
 
 (defn text-format
   "Dump the given registry using the Prometheus text format (version 0.0.4)."
