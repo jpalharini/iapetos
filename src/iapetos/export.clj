@@ -2,23 +2,24 @@
   (:require [iapetos.registry :as registry])
   (:import [io.prometheus.metrics.exporter.pushgateway PushGateway]
            [io.prometheus.metrics.expositionformats PrometheusTextFormatWriter]
-           [io.prometheus.metrics.model.registry PrometheusRegistry]))
+           [io.prometheus.metrics.model.registry PrometheusRegistry]
+           [java.io ByteArrayOutputStream]))
 
 ;; ## TextFormat (v0.0.4)
 
 (defn write-text-format!
   "Dump the given registry to the given writer using the Prometheus text format
    (version 0.0.4)."
-  [^java.io.Writer w registry]
+  [^ByteArrayOutputStream o registry]
   (let [prom-writer ^PrometheusTextFormatWriter (PrometheusTextFormatWriter/create)]
     (.write prom-writer
-            w
+            o
             (.scrape ^PrometheusRegistry (registry/raw registry)))))
 
 (defn text-format
   "Dump the given registry using the Prometheus text format (version 0.0.4)."
   [registry]
-  (with-open [out (java.io.StringWriter.)]
+  (with-open [out (ByteArrayOutputStream.)]
     (write-text-format! out registry)
     (str out)))
 
