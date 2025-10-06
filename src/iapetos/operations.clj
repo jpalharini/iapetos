@@ -1,17 +1,22 @@
 (ns iapetos.operations
   (:require [iapetos.collector :as collector])
-  (:import [io.prometheus.client
-            Counter$Child
-            Histogram$Child
-            Histogram$Timer
-            Gauge$Child
-            Gauge$Timer
-            Summary$Child
-            Summary$Timer]
-           [io.prometheus.metrics.core.datapoints DistributionDataPoint Timer TimerApi]
-           [io.prometheus.metrics.core.metrics Counter$DataPoint Gauge$DataPoint Histogram$DataPoint StatefulMetric Summary Summary$DataPoint]
-           [io.prometheus.metrics.model.snapshots ClassicHistogramBucket ClassicHistogramBuckets DataPointSnapshot DistributionDataPointSnapshot HistogramSnapshot$HistogramDataPointSnapshot Labels MetricSnapshot]
-           [java.util List]))
+  (:import [io.prometheus.metrics.core.datapoints
+            Timer
+            TimerApi]
+           [io.prometheus.metrics.core.metrics
+            Counter$DataPoint
+            Gauge$DataPoint
+            Histogram$DataPoint
+            StatefulMetric
+            Summary$DataPoint]
+           [io.prometheus.metrics.model.snapshots
+            ClassicHistogramBucket
+            ClassicHistogramBuckets
+            DataPointSnapshot
+            DistributionDataPointSnapshot
+            HistogramSnapshot$HistogramDataPointSnapshot
+            Labels
+            MetricSnapshot]))
 
 (defn- get-latest-distribution-snapshot [{:keys [register collector]} labels]
   (let [instance   ^StatefulMetric @register

@@ -4,8 +4,7 @@
             [iapetos.operations :as ops]
             [iapetos.registry :as registry])
   (:refer-clojure :exclude [get inc dec set])
-  (:import [io.prometheus.metrics.core.datapoints DistributionDataPoint]
-           [io.prometheus.metrics.core.metrics Counter
+  (:import [io.prometheus.metrics.core.metrics Counter
                                                Gauge
                                                Histogram
                                                Summary Summary$Builder]))
