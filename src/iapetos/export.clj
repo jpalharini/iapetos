@@ -1,8 +1,6 @@
 (ns iapetos.export
   (:require [iapetos.registry :as registry])
-  (:import [io.prometheus.client CollectorRegistry]
-           [io.prometheus.client.exporter
-            PushGateway]
+  (:import [io.prometheus.metrics.exporter.pushgateway PushGateway]
            [io.prometheus.metrics.expositionformats PrometheusTextFormatWriter]
            [io.prometheus.metrics.model.registry PrometheusRegistry]))
 
@@ -36,7 +34,7 @@
 
 (declare call-on-internal)
 
-(deftype PushableRegistry [internal-registry job push-gateway grouping-key]
+(deftype PushableRegistry [internal-registry push-gateway]
   registry/Registry
   (register [this metric collector]
     (call-on-internal this registry/register metric collector))
@@ -48,6 +46,8 @@
     (call-on-internal this registry/clear))
   (subsystem [this subsystem-name]
     (call-on-internal this registry/subsystem subsystem-name))
+  (get [_ metric]
+   (registry/get internal-registry metric))
   (get [_ metric labels]
     (registry/get internal-registry metric labels))
   (raw [_]
@@ -63,11 +63,7 @@
 
   Pushable
   (push! [this]
-    (.pushAdd
-      ^PushGateway       push-gateway
-      ^CollectorRegistry (registry/raw this)
-      ^String            job
-      ^java.util.Map     grouping-key)
+    (.pushAdd ^PushGateway push-gateway)
     this))
 
 (alter-meta! #'->PushableRegistry assoc :private true)
@@ -76,24 +72,29 @@
   [^PushableRegistry r f & args]
   (PushableRegistry.
     (apply f (.-internal-registry r) args)
-    (.-job r)
-    (.-push-gateway r)
-    (.-grouping-key r)))
+    (.-push-gateway r)))
 
 ;; ### Constructor
 
+(defn- with-grouping-key
+  [gateway-builder grouping-key]
+  (loop [builder gateway-builder
+         gkey    (first grouping-key)]
+    (if-let [[k v] gkey]
+      (recur (.groupingKey builder (name k) (str v)) (rest grouping-key))
+      builder)))
+
 (defn- as-push-gateway
-  ^io.prometheus.client.exporter.PushGateway
-  [gateway]
+  ^PushGateway
+  [gateway registry job grouping-key]
   (if (instance? PushGateway gateway)
     gateway
-    (PushGateway. ^String gateway)))
-
-(defn- as-grouping-key
-  [grouping-key]
-  (->> (for [[k v] grouping-key]
-         [(name k) (str v)])
-       (into {})))
+    (-> (PushGateway/builder)
+        (.address ^String gateway)
+        (.registry ^PrometheusRegistry (registry/raw registry))
+        (.job ^String job)
+        (with-grouping-key grouping-key)
+        (.build))))
 
 (defn pushable-collector-registry
   "Create a fresh iapetos collector registry whose metrics can be pushed to the
@@ -103,11 +104,10 @@
    pushable, e.g. the [[default-registry]]."
   [{:keys [job registry push-gateway grouping-key]}]
   {:pre [(string? job) push-gateway]}
-  (->PushableRegistry
-    (or registry (registry/create job))
-    job
-    (as-push-gateway push-gateway)
-    (as-grouping-key grouping-key)))
+  (let [reg (or registry (registry/create job))]
+    (->PushableRegistry
+     reg
+     (as-push-gateway push-gateway reg job grouping-key))))
 
 (defn push-registry!
   "Directly push all metrics of the given registry to the given push gateway.
@@ -116,10 +116,7 @@
   [registry {:keys [push-gateway job grouping-key]}]
   {:pre [(string? job) push-gateway]}
   (.pushAdd
-    (as-push-gateway push-gateway)
-    ^CollectorRegistry (registry/raw registry)
-    ^String            job
-    ^java.util.Map     (as-grouping-key grouping-key))
+   (as-push-gateway push-gateway registry job grouping-key))
   registry)
 
 ;; ### Macros

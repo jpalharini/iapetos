@@ -16,6 +16,7 @@
                  [io.prometheus/simpleclient_pushgateway "0.12.0"]
                  [io.prometheus/simpleclient_hotspot "0.12.0" :scope "provided"]
                  [io.prometheus/prometheus-metrics-core "1.4.1"]
+                 [io.prometheus/prometheus-metrics-exporter-pushgateway "1.4.1"]
                  [io.prometheus/prometheus-metrics-exposition-textformats "1.4.1"]
                  [io.prometheus/prometheus-metrics-instrumentation-jvm "1.4.1" :scope "provided"]]
   :profiles {:dev
