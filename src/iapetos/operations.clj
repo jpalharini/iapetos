@@ -1,6 +1,7 @@
 (ns iapetos.operations
   (:require [iapetos.collector :as collector])
-  (:import [io.prometheus.metrics.core.datapoints
+  (:import [clojure.lang MapEntry]
+           [io.prometheus.metrics.core.datapoints
             Timer
             TimerApi]
            [io.prometheus.metrics.core.metrics
@@ -16,7 +17,10 @@
             DistributionDataPointSnapshot
             HistogramSnapshot$HistogramDataPointSnapshot
             Labels
-            MetricSnapshot]))
+            MetricSnapshot
+            Quantile
+            Quantiles
+            SummarySnapshot$SummaryDataPointSnapshot]))
 
 (defn- get-latest-distribution-snapshot [{:keys [register collector]} labels]
   (let [instance   ^StatefulMetric @register
@@ -123,6 +127,13 @@
 
 ;; ## Summary
 
+(defn- quantiles->map
+  [^SummarySnapshot$SummaryDataPointSnapshot snapshot]
+  (let [quantiles ^Quantiles (.getQuantiles snapshot)]
+    (->> quantiles (.iterator) (iterator-seq)
+         (map (fn [^Quantile q] (MapEntry. (.getQuantile q) (.getValue q))))
+         (into {}))))
+
 (extend-type Summary$DataPoint
   ObservableCollector
   (observe [this amount]
@@ -138,5 +149,4 @@
       (cond-> {:count (.getCount snapshot)
                :sum   (.getSum snapshot)}
               (= type :histogram) (assoc :buckets (buckets->vec snapshot))
-              ; todo: implement similar logic to find quantiles - needs to be a map!
-              (= type :summary) (assoc :quantiles nil)))))
+              (= type :summary) (assoc :quantiles (quantiles->map snapshot))))))
