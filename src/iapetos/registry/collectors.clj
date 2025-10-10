@@ -2,7 +2,8 @@
   (:require [iapetos.metric :as metric]
             [iapetos.registry.utils :as utils]
             [iapetos.collector :as collector])
-  (:import [io.prometheus.metrics.core.metrics MetricWithFixedMetadata$Builder StatefulMetric]
+  (:import [io.prometheus.metrics.core.datapoints DistributionDataPoint]
+           [io.prometheus.metrics.core.metrics MetricWithFixedMetadata$Builder StatefulMetric]
            [io.prometheus.metrics.model.registry Collector PrometheusRegistry]))
 
 ;; ## Init
@@ -18,10 +19,12 @@
 ;; ## Management
 
 (defn- register-collector-delay
-  [^PrometheusRegistry registry ^Collector instance]
+  [^PrometheusRegistry registry instance]
   (delay
-    (.register registry instance)
-    instance))
+   (if (instance? Collector instance)
+     (.register registry ^Collector instance)
+     (.register instance registry))
+   instance))
 
 (defn- unregister-collector-delay
   [^PrometheusRegistry registry ^Collector instance]
