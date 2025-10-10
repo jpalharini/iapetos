@@ -1,6 +1,7 @@
 (ns iapetos.collector
   (:require [iapetos.metric :as metric])
-  (:import [io.prometheus.metrics.core.metrics MetricWithFixedMetadata MetricWithFixedMetadata$Builder StatefulMetric]))
+  (:import [io.prometheus.metrics.core.datapoints DistributionDataPoint]
+           [io.prometheus.metrics.core.metrics MetricWithFixedMetadata MetricWithFixedMetadata$Builder StatefulMetric]))
 
 ;; ## Protocol
 
@@ -14,10 +15,7 @@
   (metric-id [this]
     "Return user supplied (unsanitized) identifier for this collector.")
   (label-instance [this instance values]
-    "Add labels to the given collector instance produced by `instantiate`.")
-  (is-distribution? [this]
-    "Returns true if given collector is a distribution metric (histogram or summary),
-     false otherwise"))
+    "Add labels to the given collector instance produced by `instantiate`."))
 
 ;; ## Labels
 
@@ -58,6 +56,8 @@
           (pr-str subsystem)))))
   (or subsystem subsystem'))
 
+(defrecord LabeledDistributionCollector [collector ^StatefulMetric instance ^DistributionDataPoint datapoint labels])
+
 (defrecord SimpleCollectorImpl [type
                                 namespace
                                 name
@@ -84,11 +84,11 @@
      :namespace namespace})
   (metric-id [_]
     metric-id)
-  (label-instance [_ instance values]
-    (set-labels instance labels values))
-  (is-distribution? [_]
-   (or (= type :histogram)
-       (= type :summary))))
+  (label-instance [this instance values]
+    (let [labeled (set-labels instance labels values)]
+      (case type
+        (:histogram :summary) (->LabeledDistributionCollector this instance labeled values)
+        labeled))))
 
 (defn make-simple-collector
   "Create a new simple collector representation to be instantiated and

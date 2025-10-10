@@ -22,10 +22,9 @@
   (clear [registry]
     "Clear the registry, removing all collectors from it.")
   (get
-    [registry metric]
     [registry metric labels]
     "Retrieve the collector instance associated with the given metric,
-     optionally setting the given labels.")
+     setting the given labels.")
   (raw [registry]
     "Retrieve the underlying `PrometheusRegistry`.")
   (name [registry]
@@ -59,8 +58,6 @@
       registry
       (update options :subsystem utils/join-subsystem subsystem-name)
       (collectors/initialize)))
-  (get [_ metric]
-    (collectors/lookup collectors metric options))
   (get [_ metric labels]
     (collectors/by collectors metric labels options))
   (raw [_]

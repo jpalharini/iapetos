@@ -47,8 +47,6 @@
     (call-on-internal this registry/clear))
   (subsystem [this subsystem-name]
     (call-on-internal this registry/subsystem subsystem-name))
-  (get [_ metric]
-   (registry/get internal-registry metric))
   (get [_ metric labels]
     (registry/get internal-registry metric labels))
   (raw [_]

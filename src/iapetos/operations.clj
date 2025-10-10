@@ -1,15 +1,13 @@
 (ns iapetos.operations
   (:require [iapetos.collector :as collector])
   (:import [clojure.lang MapEntry]
+           [iapetos.collector LabeledDistributionCollector]
            [io.prometheus.metrics.core.datapoints
-            Timer
+            DistributionDataPoint Timer
             TimerApi]
            [io.prometheus.metrics.core.metrics
             Counter$DataPoint
-            Gauge$DataPoint
-            Histogram$DataPoint
-            StatefulMetric
-            Summary$DataPoint]
+            Gauge$DataPoint]
            [io.prometheus.metrics.model.snapshots
             ClassicHistogramBucket
             ClassicHistogramBuckets
@@ -21,17 +19,6 @@
             Quantile
             Quantiles
             SummarySnapshot$SummaryDataPointSnapshot]))
-
-(defn- get-latest-distribution-snapshot [{:keys [register collector]} labels]
-  (let [instance   ^StatefulMetric @register
-        snapshot   ^MetricSnapshot (.collect instance)
-        reg-labels ^"[Ljava.lang.String;" (into-array (:labels collector))
-        labels-obj ^Labels (Labels/of reg-labels (collector/ordered-labels reg-labels labels))]
-    (loop [datapoints (.getDataPoints snapshot)]
-      (when-let [curr-datapoint ^DataPointSnapshot (first datapoints)]
-        (if (= (.getLabels curr-datapoint) labels-obj)
-          curr-datapoint
-          (recur (rest datapoints)))))))
 
 (defn- start-timer* [^TimerApi datapoint]
   (let [^Timer t (.startTimer ^TimerApi datapoint)]
@@ -108,24 +95,23 @@
   (start-timer [this]
     (start-timer* this)))
 
-;; ## Histogram
+;; ## Histogram and Summary
+
+(defn- get-latest-distribution-snapshot [{reg-labels :labels} instance labels]
+  (let [snapshot   ^MetricSnapshot (.collect instance)
+        reg-labels ^"[Ljava.lang.String;" (into-array reg-labels)
+        labels-obj ^Labels (Labels/of reg-labels (collector/ordered-labels reg-labels labels))]
+    (loop [datapoints (.getDataPoints snapshot)]
+      (when-let [curr-datapoint ^DataPointSnapshot (first datapoints)]
+        (if (= (.getLabels curr-datapoint) labels-obj)
+          curr-datapoint
+          (recur (rest datapoints)))))))
 
 (defn- buckets->vec
   [^HistogramSnapshot$HistogramDataPointSnapshot snapshot]
   (let [buckets ^ClassicHistogramBuckets (.getClassicBuckets snapshot)]
     (->> buckets (.iterator) (iterator-seq)
          (mapv #(.getCount ^ClassicHistogramBucket %)))))
-
-(extend-type Histogram$DataPoint
-  ObservableCollector
-  (observe [this amount]
-    (.observe ^Histogram$DataPoint this (double amount)))
-
-  TimeableCollector
-  (start-timer [this]
-    (start-timer* this)))
-
-;; ## Summary
 
 (defn- quantiles->map
   [^SummarySnapshot$SummaryDataPointSnapshot snapshot]
@@ -134,19 +120,20 @@
          (map (fn [^Quantile q] (MapEntry. (.getQuantile q) (.getValue q))))
          (into {}))))
 
-(extend-type Summary$DataPoint
+(extend-type LabeledDistributionCollector
+  ReadableCollector
+  (read-value [{:keys [collector instance labels]}]
+    (when-let [snapshot ^DistributionDataPointSnapshot (get-latest-distribution-snapshot collector instance labels)]
+      (let [type (:type collector)]
+        (cond-> {:count (double (.getCount snapshot))
+                 :sum   (.getSum snapshot)}
+                (= type :histogram) (assoc :buckets (buckets->vec snapshot))
+                (= type :summary) (assoc :quantiles (quantiles->map snapshot))))))
+
   ObservableCollector
   (observe [this amount]
-    (.observe ^Summary$DataPoint this (double amount)))
+    (.observe ^DistributionDataPoint (.-datapoint this) (double amount)))
 
   TimeableCollector
   (start-timer [this]
-    (start-timer* this)))
-
-(defn read-distribution-value [metric labels]
-  (when-let [snapshot ^DistributionDataPointSnapshot (get-latest-distribution-snapshot metric labels)]
-    (let [type (-> metric :collector :type)]
-      (cond-> {:count (.getCount snapshot)
-               :sum   (.getSum snapshot)}
-              (= type :histogram) (assoc :buckets (buckets->vec snapshot))
-              (= type :summary) (assoc :quantiles (quantiles->map snapshot))))))
+    (start-timer* (.-datapoint this))))

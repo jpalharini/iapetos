@@ -337,10 +337,7 @@
    (value registry metric {}))
   ([registry metric labels]
    (with-metric-exception metric
-     (let [collector (registry/get registry metric)]
-       (if (collector/is-distribution? (:collector collector))
-         (ops/read-distribution-value collector labels)
-         (value collector))))))
+     (value (registry/get registry metric labels)))))
 
 ;; ## Compound Operations
 
