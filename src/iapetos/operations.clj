@@ -7,7 +7,7 @@
             TimerApi]
            [io.prometheus.metrics.core.metrics
             Counter$DataPoint
-            Gauge$DataPoint]
+            Gauge$DataPoint StatefulMetric]
            [io.prometheus.metrics.model.snapshots
             ClassicHistogramBucket
             ClassicHistogramBuckets
@@ -98,7 +98,7 @@
 ;; ## Histogram and Summary
 
 (defn- get-latest-distribution-snapshot [{reg-labels :labels} instance labels]
-  (let [snapshot   ^MetricSnapshot (.collect instance)
+  (let [snapshot   ^MetricSnapshot (.collect ^StatefulMetric instance)
         reg-labels ^"[Ljava.lang.String;" (into-array String reg-labels)
         labels-obj ^Labels (Labels/of reg-labels (collector/ordered-labels reg-labels labels))]
     (loop [datapoints (.getDataPoints snapshot)]

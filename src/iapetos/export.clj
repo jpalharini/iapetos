@@ -1,6 +1,6 @@
 (ns iapetos.export
   (:require [iapetos.registry :as registry])
-  (:import [io.prometheus.metrics.exporter.pushgateway Format PushGateway]
+  (:import [io.prometheus.metrics.exporter.pushgateway Format PushGateway PushGateway$Builder]
            [io.prometheus.metrics.expositionformats PrometheusTextFormatWriter]
            [io.prometheus.metrics.model.registry PrometheusRegistry]
            [java.io ByteArrayOutputStream]))
@@ -76,7 +76,7 @@
 ;; ### Constructor
 
 (defn- with-grouping-key
-  [gateway-builder grouping-key]
+  ^PushGateway$Builder [^PushGateway$Builder gateway-builder grouping-key]
   (loop [builder gateway-builder
          gkeys   grouping-key]
     (let [[k v] (first gkeys)]
