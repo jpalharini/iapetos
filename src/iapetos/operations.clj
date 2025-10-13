@@ -99,7 +99,7 @@
 
 (defn- get-latest-distribution-snapshot [{reg-labels :labels} instance labels]
   (let [snapshot   ^MetricSnapshot (.collect instance)
-        reg-labels ^"[Ljava.lang.String;" (into-array reg-labels)
+        reg-labels ^"[Ljava.lang.String;" (into-array String reg-labels)
         labels-obj ^Labels (Labels/of reg-labels (collector/ordered-labels reg-labels labels))]
     (loop [datapoints (.getDataPoints snapshot)]
       (when-let [curr-datapoint ^DataPointSnapshot (first datapoints)]
@@ -109,9 +109,18 @@
 
 (defn- buckets->vec
   [^HistogramSnapshot$HistogramDataPointSnapshot snapshot]
-  (let [buckets ^ClassicHistogramBuckets (.getClassicBuckets snapshot)]
-    (->> buckets (.iterator) (iterator-seq)
-         (mapv #(.getCount ^ClassicHistogramBucket %)))))
+  (let [buckets     ^ClassicHistogramBuckets (.getClassicBuckets snapshot)
+        bucket-vals (->> buckets (.iterator) (iterator-seq)
+                         (map #(.getCount ^ClassicHistogramBucket %)))]
+    (loop [bs   bucket-vals
+           acc 0.0
+           bf  []]
+      (if-let [b (first bs)]
+        (let [nb (+ b acc)]
+          (recur (rest bs)
+                 nb
+                 (conj bf nb)))
+        bf))))
 
 (defn- quantiles->map
   [^SummarySnapshot$SummaryDataPointSnapshot snapshot]
