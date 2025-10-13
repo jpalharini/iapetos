@@ -1,5 +1,6 @@
 (ns iapetos.collector
-  (:require [iapetos.metric :as metric])
+  (:require [clojure.string :as string]
+            [iapetos.metric :as metric])
   (:import [io.prometheus.metrics.core.datapoints DistributionDataPoint]
            [io.prometheus.metrics.core.metrics MetricWithFixedMetadata MetricWithFixedMetadata$Builder StatefulMetric]))
 
@@ -69,6 +70,10 @@
                                 lazy?]
   Collector
   (instantiate [this registry-options]
+    (assert (or (= type :counter)
+                (not (string/ends-with? name "total")))
+            (format "name for metrics of type %s must not end with 'total' (metric: %s)"
+                    (clojure.core/name type) (keyword namespace name)))
     (let [subsystem (check-subsystem this registry-options)
           name      (cond->> name
                              subsystem (str subsystem "_")
