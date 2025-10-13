@@ -22,7 +22,7 @@
 (defn- parse-subsystems
   [registry]
   (->> (export/text-format registry)
-       (re-seq #"TYPE app_(.+)_runs_total ")
+       (re-seq #"TYPE app_(.+)_runs(?:_total)? ")
        (keep second)
        (sort)))
 
