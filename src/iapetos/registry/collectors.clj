@@ -1,10 +1,7 @@
 (ns iapetos.registry.collectors
-  (:require [iapetos.metric :as metric]
-            [iapetos.registry.utils :as utils]
+  (:require [iapetos.registry.utils :as utils]
             [iapetos.collector :as collector])
-  (:import [io.prometheus.metrics.core.datapoints DistributionDataPoint]
-           [io.prometheus.metrics.core.metrics MetricWithFixedMetadata$Builder StatefulMetric]
-           [io.prometheus.metrics.model.registry Collector PrometheusRegistry]))
+  (:import [io.prometheus.metrics.model.registry Collector PrometheusRegistry]))
 
 ;; ## Init
 
