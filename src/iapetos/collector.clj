@@ -66,6 +66,7 @@
                                 description
                                 subsystem
                                 labels
+                                callbacks
                                 builder-constructor
                                 lazy?]
   Collector
@@ -103,6 +104,7 @@
            ^String subsystem
            ^String description
            labels
+           callbacks
            lazy?]
     ::metric/keys [id]}
    collector-type
@@ -116,6 +118,7 @@
      :description         description
      :subsystem           subsystem
      :labels              (label-names labels)
+     :callbacks           callbacks
      :builder-constructor builder-constructor
      :lazy?               lazy?}))
 

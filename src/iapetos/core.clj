@@ -1,13 +1,14 @@
 (ns iapetos.core
   (:require [iapetos.collector :as collector]
+            [iapetos.collector.callback :as c.callback]
             [iapetos.metric :as metric]
             [iapetos.operations :as ops]
             [iapetos.registry :as registry])
   (:refer-clojure :exclude [get inc dec set])
   (:import [io.prometheus.metrics.core.metrics Counter
-                                               Gauge
-                                               Histogram
-                                               Summary Summary$Builder]))
+                                               CounterWithCallback Gauge
+                                               GaugeWithCallback Histogram
+                                               Summary Summary$Builder SummaryWithCallback]))
 
 ;; ## Registry
 
@@ -72,35 +73,52 @@
 
 ;; ## Collectors
 
+(defn- callbacks-with-label-values [callbacks labels])
+
+
 (defn counter
   "Create a new `Counter` collector:
 
    - `:description`: a description for the counter,
-   - `:labels`: a seq of available labels for the counter.
+   - `:labels`: a seq of available labels for the counter,
+   - `:callbacks`: a seq of maps defining callbacks.:
+     - `:value-fn`: a function that returns a number,
+     - `:labels`: a map of label key to label value.
    "
   [metric
-   & [{:keys [description labels]
+   & [{:keys [description labels callbacks]
        :or {description "a counter metric."}
        :as options}]]
   (-> (merge
         {:description description}
         (metric/as-map metric options))
-      (collector/make-simple-collector :counter #(Counter/builder))))
+      (collector/make-simple-collector :counter
+       (if callbacks
+         #(.callback (CounterWithCallback/builder) (-> (c.callback/labeled callbacks labels)
+                                                       (c.callback/counter-callback)))
+         #(Counter/builder)))))
 
 (defn gauge
   "Create a new `Gauge` collector:
 
    - `:description`: a description for the gauge,
-   - `:labels`: a seq of available labels for the gauge.
+   - `:labels`: a seq of available labels for the gauge,
+   - `:callbacks`: a seq of maps defining callbacks:
+     - `:value-fn`: a function that returns a number,
+     - `:labels`: a map of label key to label value.
    "
   [metric
-   & [{:keys [description labels]
+   & [{:keys [description labels callbacks]
        :or {description "a gauge metric."}
        :as options}]]
   (-> (merge
          {:description description}
          (metric/as-map metric options))
-      (collector/make-simple-collector :gauge #(Gauge/builder))))
+      (collector/make-simple-collector :gauge
+       (if callbacks
+         #(.callback (GaugeWithCallback/builder) (-> (c.callback/labeled callbacks labels)
+                                                     (c.callback/gauge-callback)))
+         #(Gauge/builder)))))
 
 (defn histogram
   "Create a new `Histogram` collector:
@@ -130,17 +148,26 @@
    - `:description`: a description for the summary,
    - `:quantiles`: a map of double [quantile error] entries
    - `:labels`: a seq of available labels for the summary.
+   - `:callbacks`: a seq of maps defining callbacks:
+     - `:count-fn`: a function that returns a number to be set as count,
+     - `:sum-fn`: a function that returns a number to be used as sum,
+     - `:quantiles-fn`: a function that returns a map of quantile to number,
+     - `:labels`: a map of label key to label value.
    "
   [metric
-   & [{:keys [description quantiles labels]
+   & [{:keys [description quantiles labels callbacks]
        :or {description "a summary metric."}
        :as options}]]
-  (-> (merge
+  (let [builder (if callbacks
+                  #(-> (.callback (SummaryWithCallback/builder) (-> (c.callback/labeled callbacks labels)
+                                                                    (c.callback/summary-callback))))
+                  #(Summary/builder))]
+    (-> (merge
          {:description description}
          (metric/as-map metric options))
-      (collector/make-simple-collector
-       :summary
-       #(reduce add-quantile (Summary/builder) quantiles))))
+        (collector/make-simple-collector
+         :summary
+         #(reduce add-quantile (builder) quantiles)))))
 
 ;; ## Raw Operations
 
