@@ -1,18 +1,24 @@
 (ns iapetos.operations
   (:require [iapetos.collector :as collector])
   (:import [clojure.lang MapEntry]
-           [iapetos.collector LabeledDistributionCollector]
+           [iapetos.collector
+            LabeledCallbackCollector
+            LabeledDistributionCollector]
            [io.prometheus.metrics.core.datapoints
-            DistributionDataPoint Timer
+            DistributionDataPoint
+            Timer
             TimerApi]
            [io.prometheus.metrics.core.metrics
             Counter$DataPoint
-            Gauge$DataPoint StatefulMetric]
+            Gauge$DataPoint
+            MetricWithFixedMetadata]
            [io.prometheus.metrics.model.snapshots
             ClassicHistogramBucket
             ClassicHistogramBuckets
+            CounterSnapshot$CounterDataPointSnapshot
             DataPointSnapshot
             DistributionDataPointSnapshot
+            GaugeSnapshot$GaugeDataPointSnapshot
             HistogramSnapshot$HistogramDataPointSnapshot
             Labels
             MetricSnapshot
@@ -97,8 +103,8 @@
 
 ;; ## Histogram and Summary
 
-(defn- get-latest-distribution-snapshot [{reg-labels :labels} instance labels]
-  (let [snapshot   ^MetricSnapshot (.collect ^StatefulMetric instance)
+(defn- get-latest-snapshot [{reg-labels :labels} instance labels]
+  (let [snapshot   ^MetricSnapshot (.collect ^MetricWithFixedMetadata instance)
         reg-labels ^"[Ljava.lang.String;" (into-array String reg-labels)
         labels-obj ^Labels (Labels/of reg-labels (collector/ordered-labels reg-labels labels))]
     (loop [datapoints (.getDataPoints snapshot)]
@@ -129,15 +135,17 @@
          (map (fn [^Quantile q] (MapEntry. (.getQuantile q) (.getValue q))))
          (into {}))))
 
+(defn- read-distribution-snapshot-value [type ^DistributionDataPointSnapshot snapshot]
+  (cond-> {:count (double (.getCount snapshot))
+           :sum   (.getSum snapshot)}
+          (= type :histogram) (assoc :buckets (buckets->vec snapshot))
+          (= type :summary) (assoc :quantiles (quantiles->map snapshot))))
+
 (extend-type LabeledDistributionCollector
   ReadableCollector
   (read-value [{:keys [collector instance labels]}]
-    (when-let [snapshot ^DistributionDataPointSnapshot (get-latest-distribution-snapshot collector instance labels)]
-      (let [type (:type collector)]
-        (cond-> {:count (double (.getCount snapshot))
-                 :sum   (.getSum snapshot)}
-                (= type :histogram) (assoc :buckets (buckets->vec snapshot))
-                (= type :summary) (assoc :quantiles (quantiles->map snapshot))))))
+    (when-let [snapshot (get-latest-snapshot collector instance labels)]
+      (read-distribution-snapshot-value (:type collector) snapshot)))
 
   ObservableCollector
   (observe [this amount]
@@ -146,3 +154,12 @@
   TimeableCollector
   (start-timer [this]
     (start-timer* (.-datapoint this))))
+
+(extend-type LabeledCallbackCollector
+  ReadableCollector
+  (read-value [{:keys [collector instance labels]}]
+   (when-let [snapshot (get-latest-snapshot collector instance labels)]
+     (case (:type collector)
+       :counter (.getValue ^CounterSnapshot$CounterDataPointSnapshot snapshot)
+       :gauge (.getValue ^GaugeSnapshot$GaugeDataPointSnapshot snapshot)
+       :summary (read-distribution-snapshot-value :summary snapshot)))))

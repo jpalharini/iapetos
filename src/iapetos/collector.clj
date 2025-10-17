@@ -1,8 +1,13 @@
 (ns iapetos.collector
   (:require [clojure.string :as string]
             [iapetos.metric :as metric])
-  (:import [io.prometheus.metrics.core.datapoints DistributionDataPoint]
-           [io.prometheus.metrics.core.metrics MetricWithFixedMetadata MetricWithFixedMetadata$Builder StatefulMetric]))
+  (:import [io.prometheus.metrics.core.datapoints
+            DistributionDataPoint]
+           [io.prometheus.metrics.core.metrics
+            CallbackMetric
+            MetricWithFixedMetadata
+            MetricWithFixedMetadata$Builder
+            StatefulMetric]))
 
 ;; ## Protocol
 
@@ -59,6 +64,8 @@
 
 (defrecord LabeledDistributionCollector [collector ^StatefulMetric instance ^DistributionDataPoint datapoint labels])
 
+(defrecord LabeledCallbackCollector [collector ^CallbackMetric instance labels])
+
 (defrecord SimpleCollectorImpl [type
                                 namespace
                                 name
@@ -91,10 +98,12 @@
   (metric-id [_]
     metric-id)
   (label-instance [this instance values]
-    (let [labeled (set-labels instance labels values)]
-      (case type
-        (:histogram :summary) (->LabeledDistributionCollector this instance labeled values)
-        labeled))))
+    (if callbacks
+      (->LabeledCallbackCollector this instance values)
+      (let [labeled (set-labels instance labels values)]
+        (case type
+          (:histogram :summary) (->LabeledDistributionCollector this instance labeled values)
+          labeled)))))
 
 (defn make-simple-collector
   "Create a new simple collector representation to be instantiated and
