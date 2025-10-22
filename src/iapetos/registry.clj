@@ -75,7 +75,11 @@
   (valAt [this k]
     (get this k {}))
   (valAt [this k default]
-    (or (get this k {}) default)))
+    (or (get this k {}) default))
+
+  clojure.lang.Seqable
+  (seq [_]
+    (collectors/registered-metrics collectors)))
 
 (defn- set-collectors
   [^IapetosRegistry r collectors]
